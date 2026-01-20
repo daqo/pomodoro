@@ -1,136 +1,150 @@
-# Pomodoro Timer App
+# Pomodoro Timer
 
-A neobrutalist-style Pomodoro timer web app built with React. Track work sessions with automatic rest periods and view your productivity history.
+A minimalist Pomodoro timer with automatic rest periods and productivity tracking. Built with React and client-side SQLite.
+
+## Quick Start
+
+```bash
+npm install
+npm run dev
+```
+
+Open http://localhost:5173
 
 ## Tech Stack
 
-- **React 18** - UI framework
-- **Vite** - Build tool and dev server
-- **sql.js** - SQLite compiled to WebAssembly (client-side database)
-- **localStorage** - Database persistence
+| Technology | Purpose |
+|------------|---------|
+| React 18 | UI framework |
+| Vite | Build tool and dev server |
+| sql.js | SQLite compiled to WebAssembly |
+| localStorage | Database persistence |
 
 ## Project Structure
 
 ```
 src/
-├── App.jsx      # Main component with all UI and timer logic
-├── db.js        # Database layer (sql.js + localStorage)
-├── index.css    # All styles (neobrutalist design)
+├── App.jsx      # Main component (UI, state, timer logic)
+├── db.js        # Database layer (sql.js wrapper)
+├── index.css    # Styles (neobrutalist design)
 └── main.jsx     # React entry point
 ```
 
-## Running the App
+## How It Works
 
-```bash
-npm install
-npm run dev      # Development server at localhost:5173
-npm run build    # Production build
-npm run preview  # Preview production build
+### Timer Flow
+
+```
+Start Pomodoro (25/45/55 min)
+        ↓
+    Work Period
+        ↓
+    Timer hits 0
+        ↓
+  Auto-start Rest (5 min)
+        ↓
+    Rest Period
+        ↓
+    Timer hits 0
+        ↓
+      Done
 ```
 
-## Database Schema
+### Views
 
-Single table `pomodoros` stores both work sessions and rest periods:
+**Day View** - Default view showing today's pomodoros and rest periods as a timeline. Start new pomodoros here.
+
+**Month View** - Calendar showing pomodoro counts per day. Click a day to see its details.
+
+**Timer View** - Fullscreen countdown display. Appears when a timer is active.
+
+### Entry States
+
+| State | Color | Badge |
+|-------|-------|-------|
+| Ongoing Work | Amber | LIVE |
+| Completed Work | Green | Checkmark |
+| Ongoing Rest | Blue | LIVE |
+| Completed Rest | Gray | Checkmark |
+
+## Key Files
+
+### `src/App.jsx`
+
+Main React component containing:
+
+- **State management** - Timer state, view state, form state
+- **Effects** - DB initialization, timer countdown, auto-completion
+- **Event handlers** - Starting pomodoros, clicking entries, navigation
+
+Key state variables:
+
+```javascript
+activeEntry   // Currently running pomodoro/rest (or null)
+timeLeft      // Seconds remaining
+isRunning     // Timer actively counting
+showTimer     // Fullscreen timer vs list view
+```
+
+### `src/db.js`
+
+Database layer wrapping sql.js:
+
+```javascript
+initDb()                      // Initialize database
+addPomodoro(name, duration, date)   // Create work session
+addRest(duration, date)       // Create rest period
+completePomodoro(id)          // Mark entry done
+getPomodorosForDate(date)     // Get day's entries
+getOngoingEntry()             // Get active entry
+getPomodorosForMonth(y, m)    // Get monthly stats
+```
+
+**Single source of truth**: After mutations, always fetch fresh data from DB using `getOngoingEntry()` rather than relying on stale UI state.
+
+## Database
+
+Uses SQLite in the browser via sql.js (WebAssembly). Data persists in localStorage indefinitely until cleared.
+
+### Schema
 
 ```sql
 CREATE TABLE pomodoros (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,           -- Display name ("Rest" for rest entries)
-  duration INTEGER NOT NULL,    -- Duration in minutes
-  date TEXT NOT NULL,           -- Date string "YYYY-MM-DD"
-  completed INTEGER DEFAULT 0,  -- 0 = ongoing, 1 = completed
-  started_at INTEGER,           -- Unix timestamp (milliseconds)
-  type TEXT DEFAULT 'pomodoro'  -- "pomodoro" or "rest"
+  name TEXT NOT NULL,
+  duration INTEGER NOT NULL,      -- minutes
+  date TEXT NOT NULL,             -- YYYY-MM-DD
+  completed INTEGER DEFAULT 0,    -- 0 or 1
+  started_at INTEGER,             -- Unix timestamp (ms)
+  type TEXT DEFAULT 'pomodoro'    -- 'pomodoro' or 'rest'
 )
 ```
 
-**Key DB functions in `db.js`:**
-- `initDb()` - Initialize database, run migrations, load from localStorage
-- `addPomodoro(name, duration, date)` - Create new work session
-- `addRest(duration, date)` - Create new rest period
-- `completePomodoro(id)` - Mark entry as completed
-- `getPomodorosForDate(date)` - Get all entries for a day (sorted by started_at ASC)
-- `getOngoingEntry()` - Get the current uncompleted entry (if any)
-- `getPomodorosForMonth(year, month)` - Get entry counts per day for calendar
+### Clearing Data
 
-## Key State Variables (App.jsx)
-
-| State | Type | Purpose |
-|-------|------|---------|
-| `dbReady` | boolean | Whether database is initialized |
-| `view` | 'day' \| 'month' | Current calendar view |
-| `currentDate` | Date | Selected date for viewing |
-| `pomodoros` | array | Entries for current day view |
-| `activeEntry` | object \| null | Currently running pomodoro/rest |
-| `timeLeft` | number | Seconds remaining on timer |
-| `isRunning` | boolean | Whether timer is actively counting |
-| `showTimer` | boolean | Show fullscreen timer vs list view |
-
-## Timer Flow
-
-1. **Start Pomodoro**: User enters name, selects duration (25/45/55 min), clicks Start
-2. **Work Period**: Timer counts down, entry saved to DB with `type: 'pomodoro'`
-3. **Auto Rest**: When work timer hits 0, entry marked complete, new `type: 'rest'` entry created automatically (5 min)
-4. **Rest Period**: Timer counts down the rest period
-5. **Complete**: When rest ends, entry marked complete, timer stops
-
-## Views
-
-### Day View (default)
-- Shows date header
-- "New Pomodoro" button (only for today, not past/future days)
-- Timeline of work and rest blocks
-- Ongoing entry shows "LIVE" badge and countdown
-
-### Month View
-- Calendar grid with navigation
-- Today highlighted in yellow
-- Future days grayed out
-- Shows count of entries per day
-- Click day to switch to day view
-
-### Timer View
-- Fullscreen timer display
-- Shows "Work Time" or "Rest Time" badge
-- Back button to return to list
-- Manual complete button
-
-## Entry States & Colors
-
-| State | Type | Color | Description |
-|-------|------|-------|-------------|
-| Completed Work | pomodoro | Green (#bbf7d0) | Finished work session |
-| Ongoing Work | pomodoro | Amber (#fde68a) | Active work timer + LIVE badge |
-| Completed Rest | rest | Gray (#e5e7eb) | Finished rest period |
-| Ongoing Rest | rest | Blue (#bfdbfe) | Active rest timer + LIVE badge |
-
-## Important Implementation Details
-
-### Date Handling
-Uses local timezone, NOT UTC. The `formatDate()` function uses `getFullYear()`, `getMonth()`, `getDate()` to avoid timezone issues with `toISOString()`.
-
-### Timer Persistence
-On page load, `getOngoingEntry()` checks for uncompleted entries. If found and time remains, the timer resumes automatically.
-
-### Preventing Double Completion
-`completedRef` (useRef) tracks the last completed entry ID to prevent the completion effect from running multiple times for the same entry.
-
-### Identifying Ongoing Entry in List
-```js
-const isOngoing = isRunning && activeEntry != null && String(entry.id) === String(activeEntry.id)
-```
-Uses string comparison to handle potential type mismatches between IDs.
-
-## Configuration Constants
-
-```js
-const DURATION_OPTIONS = [25, 45, 55]  // Work duration options in minutes
-const REST_DURATION = 5                 // Rest period in minutes
-```
-
-## Clearing Data
-
-To reset the app, clear localStorage:
-```js
+```javascript
 localStorage.removeItem('pomodoro_db')
 ```
+
+## Configuration
+
+Constants in `App.jsx`:
+
+```javascript
+DURATION_OPTIONS = [25, 45, 55]    // Work durations (minutes)
+REST_DURATION_MINUTES = 5          // Rest duration (minutes)
+```
+
+## Commands
+
+```bash
+npm run dev      # Start dev server (localhost:5173)
+npm run build    # Production build to dist/
+npm run preview  # Preview production build
+```
+
+## Implementation Notes
+
+**Timer persistence** - On page load, checks for incomplete entries. If time remains, resumes automatically.
+
+**Date handling** - Uses local timezone via `getFullYear()`/`getMonth()`/`getDate()`. Avoids `toISOString()` to prevent UTC issues.
