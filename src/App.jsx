@@ -207,10 +207,12 @@ function App() {
     completedRef.current = activeEntry.id
     completePomodoro(activeEntry.id)
 
+    const isTabHidden = document.visibilityState === 'hidden'
+
     if (activeEntry.type === 'pomodoro') {
       // Start a rest period after pomodoro completion
       showTimerComplete('pomodoro', activeEntry.name, stopAllSounds)
-      playWorkComplete()
+      playWorkComplete(isTabHidden)
       addRest(REST_DURATION_MINUTES, currentDateStr)
       const ongoing = getOngoingEntry()
       setActiveEntry(ongoing)
@@ -223,7 +225,7 @@ function App() {
     } else {
       // Rest period finished - reset timer state
       showTimerComplete('rest', activeEntry.name, stopAllSounds)
-      playRestComplete()
+      playRestComplete(isTabHidden)
       workerRef.current?.postMessage({ type: 'stop' })
       setPomodoros(getPomodorosForDate(currentDateStr))
       setIsRunning(false)
