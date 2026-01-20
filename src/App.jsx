@@ -213,11 +213,13 @@ function App() {
       // Start a rest period after pomodoro completion
       showTimerComplete('pomodoro', activeEntry.name, stopAllSounds)
       playWorkComplete(isTabHidden)
-      addRest(REST_DURATION_MINUTES, currentDateStr)
+      addRest(REST_DURATION_MINUTES, activeEntry.date)
       const ongoing = getOngoingEntry()
       setActiveEntry(ongoing)
       setTimeLeft(REST_DURATION_MINUTES * SECONDS_PER_MINUTE)
-      setPomodoros(getPomodorosForDate(currentDateStr))
+      if (activeEntry.date === currentDateStr) {
+        setPomodoros(getPomodorosForDate(currentDateStr))
+      }
 
       // Start worker for rest period
       const endTime = Date.now() + REST_DURATION_MINUTES * SECONDS_PER_MINUTE * 1000
@@ -227,12 +229,14 @@ function App() {
       showTimerComplete('rest', activeEntry.name, stopAllSounds)
       playRestComplete(isTabHidden)
       workerRef.current?.postMessage({ type: 'stop' })
-      setPomodoros(getPomodorosForDate(currentDateStr))
+      if (activeEntry.date === currentDateStr) {
+        setPomodoros(getPomodorosForDate(currentDateStr))
+      }
       setIsRunning(false)
       setActiveEntry(null)
       completedRef.current = null
     }
-  }, [timeLeft, isRunning, activeEntry, currentDateStr])
+  }, [timeLeft, isRunning, activeEntry])
 
   // ---------------------------------------------------------------------------
   // Event Handlers (memoized with useCallback to prevent unnecessary re-renders)
