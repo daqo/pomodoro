@@ -14,7 +14,7 @@ import { playWorkComplete, playRestComplete, unlockAudio } from './sounds'
 // Constants
 // ============================================================================
 
-const DEFAULT_DURATION = 0.1
+const DEFAULT_DURATION = 25
 const MIN_DURATION = 0.01
 const MAX_DURATION = 60
 const REST_DURATION_MINUTES = 5
