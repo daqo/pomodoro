@@ -24,10 +24,13 @@ Open http://localhost:5173
 
 ```
 src/
-├── App.jsx      # Main component (UI, state, timer logic)
-├── db.js        # Database layer (sql.js wrapper)
-├── index.css    # Styles (neobrutalist design)
-└── main.jsx     # React entry point
+├── App.jsx          # Main component (UI, state, timer logic)
+├── db.js            # Database layer (sql.js wrapper)
+├── sounds.js        # Audio playback for timer completion
+├── notifications.js # Browser Notification API wrapper
+├── timerWorker.js   # Web Worker for background timing
+├── index.css        # Styles (neobrutalist design)
+└── main.jsx         # React entry point
 ```
 
 ## How It Works
@@ -148,3 +151,87 @@ npm run preview  # Preview production build
 **Timer persistence** - On page load, checks for incomplete entries. If time remains, resumes automatically.
 
 **Date handling** - Uses local timezone via `getFullYear()`/`getMonth()`/`getDate()`. Avoids `toISOString()` to prevent UTC issues.
+
+## Background Tab Audio
+
+Browsers throttle JavaScript timers in background tabs, which can delay or prevent timer completion sounds. Here's how this app ensures reliable audio playback even when the tab is in the background:
+
+### The Problem
+
+1. When a browser tab is in the background, `setInterval` can be throttled to run only once per second or less
+2. Audio playback triggered by throttled JavaScript may be delayed until the user returns to the tab
+3. The timer UI may show incorrect time when returning to a background tab
+
+### The Solution: Web Workers + Notifications
+
+#### Step 1: Web Worker for Accurate Timing
+
+A Web Worker (`src/timerWorker.js`) runs in a separate thread that is not throttled by the browser:
+
+```javascript
+// Worker receives an endTime timestamp and checks every second
+self.onmessage = (e) => {
+  if (e.data.type === 'start') {
+    intervalId = setInterval(() => {
+      if (Date.now() >= e.data.endTime) {
+        self.postMessage({ type: 'complete' })
+        clearInterval(intervalId)
+      }
+    }, 1000)
+  }
+}
+```
+
+#### Step 2: Browser Notifications
+
+The app requests notification permission when starting a timer. When the worker detects completion:
+
+1. A browser notification is shown (works even in background tabs)
+2. The notification includes the pomodoro name and completion message
+3. Clicking the notification focuses the tab
+
+#### Step 3: Dual Timer System
+
+The app runs two timers in parallel:
+
+| Timer | Purpose | Location |
+|-------|---------|----------|
+| `setInterval` in main thread | Updates UI countdown display | `App.jsx` |
+| `setInterval` in Web Worker | Detects actual completion time | `timerWorker.js` |
+
+#### Step 4: Visibility Change Handler
+
+When the user returns to the tab, the app recalculates the remaining time from the database:
+
+```javascript
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    const remaining = calculateRemainingTime(activeEntry)
+    setTimeLeft(remaining)
+  }
+})
+```
+
+### How It All Works Together
+
+1. User starts a 25-minute pomodoro
+2. Main thread starts `setInterval` for UI updates
+3. Web Worker starts with `endTime = Date.now() + 25 * 60 * 1000`
+4. User switches to another tab
+5. Main thread timer gets throttled (UI updates pause)
+6. Web Worker continues running accurately in background
+7. After 25 minutes, Worker posts `{ type: 'complete' }`
+8. Main thread receives message, triggers:
+   - Browser notification (visible even in background)
+   - Sound playback via `sounds.js`
+   - State update to start rest period
+9. User returns to tab, sees completed state and rest timer running
+
+### Files Involved
+
+| File | Role |
+|------|------|
+| `timerWorker.js` | Background timing (not throttled) |
+| `notifications.js` | Browser notification API wrapper |
+| `sounds.js` | Audio playback (work/rest complete sounds) |
+| `App.jsx` | Orchestrates worker, notifications, and UI |

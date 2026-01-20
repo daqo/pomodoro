@@ -9,6 +9,8 @@ import {
   getOngoingEntry
 } from './db'
 import { playWorkComplete, playRestComplete, unlockAudio } from './sounds'
+import { requestPermission, showTimerComplete } from './notifications'
+import TimerWorker from './timerWorker.js?worker'
 
 // ============================================================================
 // Constants
@@ -97,6 +99,7 @@ function App() {
   const [isRunning, setIsRunning] = useState(false)
   const [showTimer, setShowTimer] = useState(false)
   const completedRef = useRef(null)
+  const workerRef = useRef(null)
 
   // ---------------------------------------------------------------------------
   // State: New Pomodoro Form
@@ -128,11 +131,33 @@ function App() {
           setActiveEntry(ongoing)
           setTimeLeft(remaining)
           setIsRunning(true)
+
+          // Start worker for resumed timer (worker may not be ready yet, so delay slightly)
+          setTimeout(() => {
+            const endTime = Date.now() + remaining * 1000
+            workerRef.current?.postMessage({ type: 'start', endTime })
+          }, 100)
         } else {
           completePomodoro(ongoing.id)
         }
       }
     })
+  }, [])
+
+  // Initialize Web Worker for background timing
+  useEffect(() => {
+    workerRef.current = new TimerWorker()
+
+    workerRef.current.onmessage = (e) => {
+      if (e.data.type === 'complete') {
+        // Worker detected timer completion - trigger completion logic
+        setTimeLeft(0)
+      }
+    }
+
+    return () => {
+      workerRef.current?.terminate()
+    }
   }, [])
 
   // Fetch data when view or date changes
@@ -182,16 +207,22 @@ function App() {
 
     if (activeEntry.type === 'pomodoro') {
       // Start a rest period after pomodoro completion
-      console.log('completed')
+      showTimerComplete('pomodoro', activeEntry.name)
       playWorkComplete()
       addRest(REST_DURATION_MINUTES, currentDateStr)
       const ongoing = getOngoingEntry()
       setActiveEntry(ongoing)
       setTimeLeft(REST_DURATION_MINUTES * SECONDS_PER_MINUTE)
       setPomodoros(getPomodorosForDate(currentDateStr))
+
+      // Start worker for rest period
+      const endTime = Date.now() + REST_DURATION_MINUTES * SECONDS_PER_MINUTE * 1000
+      workerRef.current?.postMessage({ type: 'start', endTime })
     } else {
       // Rest period finished - reset timer state
+      showTimerComplete('rest', activeEntry.name)
       playRestComplete()
+      workerRef.current?.postMessage({ type: 'stop' })
       setPomodoros(getPomodorosForDate(currentDateStr))
       setIsRunning(false)
       setActiveEntry(null)
@@ -211,6 +242,7 @@ function App() {
     if (isNaN(duration) || duration < MIN_DURATION || duration > MAX_DURATION) return
 
     unlockAudio()
+    requestPermission() // Request notification permission on first timer start
     addPomodoro(trimmedName, duration, currentDateStr)
     const ongoing = getOngoingEntry()
     setActiveEntry(ongoing)
@@ -221,6 +253,10 @@ function App() {
     setNewName('')
     setNewDuration(String(DEFAULT_DURATION))
     setPomodoros(getPomodorosForDate(currentDateStr))
+
+    // Start worker for background timing
+    const endTime = Date.now() + duration * SECONDS_PER_MINUTE * 1000
+    workerRef.current?.postMessage({ type: 'start', endTime })
   }, [newName, newDuration, currentDateStr])
 
   const handleEntryClick = useCallback((entry) => {
@@ -232,12 +268,17 @@ function App() {
     if (remaining > 0) {
       // Resume the ongoing timer
       unlockAudio()
+      requestPermission() // Request notification permission when resuming
       const ongoing = getOngoingEntry()
       if (ongoing) {
         setActiveEntry(ongoing)
         setTimeLeft(remaining)
         setIsRunning(true)
         setShowTimer(true)
+
+        // Start worker for background timing
+        const endTime = Date.now() + remaining * 1000
+        workerRef.current?.postMessage({ type: 'start', endTime })
       }
     } else {
       // Time expired - mark as complete
@@ -249,6 +290,7 @@ function App() {
   const handleManualComplete = useCallback(() => {
     if (!activeEntry) return
 
+    workerRef.current?.postMessage({ type: 'stop' })
     completePomodoro(activeEntry.id)
     setPomodoros(getPomodorosForDate(currentDateStr))
     setIsRunning(false)
