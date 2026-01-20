@@ -8,6 +8,7 @@ import {
   getPomodorosForMonth,
   getOngoingEntry
 } from './db'
+import { playWorkComplete, playRestComplete } from './sounds'
 
 // ============================================================================
 // Constants
@@ -164,6 +165,7 @@ function App() {
 
     if (activeEntry.type === 'pomodoro') {
       // Start a rest period after pomodoro completion
+      playWorkComplete()
       addRest(REST_DURATION_MINUTES, currentDateStr)
       const ongoing = getOngoingEntry()
       setActiveEntry(ongoing)
@@ -171,6 +173,7 @@ function App() {
       setPomodoros(getPomodorosForDate(currentDateStr))
     } else {
       // Rest period finished - reset timer state
+      playRestComplete()
       setPomodoros(getPomodorosForDate(currentDateStr))
       setIsRunning(false)
       setActiveEntry(null)
