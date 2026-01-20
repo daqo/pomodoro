@@ -184,7 +184,7 @@ function App() {
 
   const handleStartPomodoro = useCallback(() => {
     const trimmedName = newName.trim()
-    if (!trimmedName) return
+    if (!trimmedName || trimmedName.length > 100) return
 
     addPomodoro(trimmedName, newDuration, currentDateStr)
     const ongoing = getOngoingEntry()
@@ -343,6 +343,7 @@ function App() {
                 value={newName}
                 onChange={handleNameChange}
                 className="name-input"
+                maxLength={100}
                 autoFocus
               />
               <div className="duration-selector">
