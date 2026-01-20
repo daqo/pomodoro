@@ -26,8 +26,9 @@ export async function requestPermission() {
  * Shows a notification for timer completion.
  * @param {'pomodoro' | 'rest'} type - The type of timer that completed
  * @param {string} name - The name of the pomodoro
+ * @param {Function} onInteract - Callback when user clicks notification
  */
-export function showTimerComplete(type, name) {
+export function showTimerComplete(type, name, onInteract) {
   if (!('Notification' in window) || Notification.permission !== 'granted') {
     return
   }
@@ -45,12 +46,10 @@ export function showTimerComplete(type, name) {
     requireInteraction: true
   })
 
-  // Close notification after 10 seconds
-  setTimeout(() => notification.close(), 10000)
-
-  // Focus the tab when notification is clicked
+  // Focus the tab and stop sound when notification is clicked
   notification.onclick = () => {
     window.focus()
     notification.close()
+    if (onInteract) onInteract()
   }
 }

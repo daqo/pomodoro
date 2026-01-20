@@ -23,6 +23,7 @@ export function unlockAudio() {
 
 export function playWorkComplete() {
   workCompleteSound.currentTime = 0
+  workCompleteSound.loop = true
   workCompleteSound.play().catch((error) => {
     console.error('Failed to play work complete sound:', error.message)
   })
@@ -30,7 +31,17 @@ export function playWorkComplete() {
 
 export function playRestComplete() {
   restCompleteSound.currentTime = 0
+  restCompleteSound.loop = true
   restCompleteSound.play().catch((error) => {
     console.error('Failed to play rest complete sound:', error.message)
   })
+}
+
+export function stopAllSounds() {
+  workCompleteSound.pause()
+  workCompleteSound.currentTime = 0
+  workCompleteSound.loop = false
+  restCompleteSound.pause()
+  restCompleteSound.currentTime = 0
+  restCompleteSound.loop = false
 }

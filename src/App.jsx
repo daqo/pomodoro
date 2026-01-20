@@ -8,7 +8,7 @@ import {
   getPomodorosForMonth,
   getOngoingEntry
 } from './db'
-import { playWorkComplete, playRestComplete, unlockAudio } from './sounds'
+import { playWorkComplete, playRestComplete, unlockAudio, stopAllSounds } from './sounds'
 import { requestPermission, showTimerComplete } from './notifications'
 import TimerWorker from './timerWorker.js?worker'
 
@@ -183,13 +183,15 @@ function App() {
   }, [isRunning, activeEntry])
 
   // Recalculate time when tab becomes visible (fixes browser throttling)
+  // Also stop any looping sounds when user returns to tab
   useEffect(() => {
-    if (!isRunning || !activeEntry) return
-
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        const remaining = calculateRemainingTime(activeEntry)
-        setTimeLeft(remaining)
+        stopAllSounds()
+        if (isRunning && activeEntry) {
+          const remaining = calculateRemainingTime(activeEntry)
+          setTimeLeft(remaining)
+        }
       }
     }
 
@@ -207,7 +209,7 @@ function App() {
 
     if (activeEntry.type === 'pomodoro') {
       // Start a rest period after pomodoro completion
-      showTimerComplete('pomodoro', activeEntry.name)
+      showTimerComplete('pomodoro', activeEntry.name, stopAllSounds)
       playWorkComplete()
       addRest(REST_DURATION_MINUTES, currentDateStr)
       const ongoing = getOngoingEntry()
@@ -220,7 +222,7 @@ function App() {
       workerRef.current?.postMessage({ type: 'start', endTime })
     } else {
       // Rest period finished - reset timer state
-      showTimerComplete('rest', activeEntry.name)
+      showTimerComplete('rest', activeEntry.name, stopAllSounds)
       playRestComplete()
       workerRef.current?.postMessage({ type: 'stop' })
       setPomodoros(getPomodorosForDate(currentDateStr))
