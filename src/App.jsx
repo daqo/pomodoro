@@ -14,7 +14,9 @@ import { playWorkComplete, playRestComplete } from './sounds'
 // Constants
 // ============================================================================
 
-const DURATION_OPTIONS = [25, 45, 55]
+const DEFAULT_DURATION = 0.1
+const MIN_DURATION = 0.01
+const MAX_DURATION = 60
 const REST_DURATION_MINUTES = 5
 const SECONDS_PER_MINUTE = 60
 const TIMER_INTERVAL_MS = 1000
@@ -101,7 +103,7 @@ function App() {
   // ---------------------------------------------------------------------------
   const [showForm, setShowForm] = useState(false)
   const [newName, setNewName] = useState('')
-  const [newDuration, setNewDuration] = useState(DURATION_OPTIONS[0])
+  const [newDuration, setNewDuration] = useState(String(DEFAULT_DURATION))
 
   // ---------------------------------------------------------------------------
   // Derived Values (memoized to avoid recalculation on every render)
@@ -155,6 +157,21 @@ function App() {
     return () => clearInterval(interval)
   }, [isRunning, activeEntry])
 
+  // Recalculate time when tab becomes visible (fixes browser throttling)
+  useEffect(() => {
+    if (!isRunning || !activeEntry) return
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const remaining = calculateRemainingTime(activeEntry)
+        setTimeLeft(remaining)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [isRunning, activeEntry])
+
   // Handle timer completion (pomodoro -> rest transition, or rest -> done)
   useEffect(() => {
     if (!isRunning || !activeEntry || timeLeft > 0) return
@@ -165,6 +182,7 @@ function App() {
 
     if (activeEntry.type === 'pomodoro') {
       // Start a rest period after pomodoro completion
+      console.log('completed')
       playWorkComplete()
       addRest(REST_DURATION_MINUTES, currentDateStr)
       const ongoing = getOngoingEntry()
@@ -189,14 +207,18 @@ function App() {
     const trimmedName = newName.trim()
     if (!trimmedName || trimmedName.length > 100) return
 
-    addPomodoro(trimmedName, newDuration, currentDateStr)
+    const duration = parseFloat(newDuration)
+    if (isNaN(duration) || duration < MIN_DURATION || duration > MAX_DURATION) return
+
+    addPomodoro(trimmedName, duration, currentDateStr)
     const ongoing = getOngoingEntry()
     setActiveEntry(ongoing)
-    setTimeLeft(newDuration * SECONDS_PER_MINUTE)
+    setTimeLeft(duration * SECONDS_PER_MINUTE)
     setIsRunning(true)
     setShowTimer(true)
     setShowForm(false)
     setNewName('')
+    setNewDuration(String(DEFAULT_DURATION))
     setPomodoros(getPomodorosForDate(currentDateStr))
   }, [newName, newDuration, currentDateStr])
 
@@ -249,6 +271,13 @@ function App() {
   const handleHideForm = useCallback(() => setShowForm(false), [])
   const handleHideTimer = useCallback(() => setShowTimer(false), [])
   const handleNameChange = useCallback((e) => setNewName(e.target.value), [])
+  const handleDurationChange = useCallback((e) => {
+    const value = e.target.value
+    // Only allow digits
+    if (value === '' || /^\d+$/.test(value)) {
+      setNewDuration(value)
+    }
+  }, [])
 
   // ---------------------------------------------------------------------------
   // Memoized Computed Values
@@ -349,16 +378,17 @@ function App() {
                 maxLength={100}
                 autoFocus
               />
-              <div className="duration-selector">
-                {DURATION_OPTIONS.map(duration => (
-                  <button
-                    key={duration}
-                    className={`duration-btn ${newDuration === duration ? 'active' : ''}`}
-                    onClick={() => setNewDuration(duration)}
-                  >
-                    {duration}m
-                  </button>
-                ))}
+              <div className="duration-input-wrapper">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="25"
+                  value={newDuration}
+                  onChange={handleDurationChange}
+                  className="duration-input"
+                  maxLength={2}
+                />
+                <span className="duration-label">minutes (1-60)</span>
               </div>
               <div className="form-actions">
                 <button className="control-btn start" onClick={handleStartPomodoro}>
