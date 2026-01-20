@@ -1,12 +1,36 @@
-const workCompleteSound = new Audio('/work-complete.wav')
-const restCompleteSound = new Audio('/rest-complete.wav')
+const basePath = import.meta.env.BASE_URL
+const workCompleteSound = new Audio(basePath + 'work-complete.wav')
+const restCompleteSound = new Audio(basePath + 'rest-complete.wav')
+
+// Call this on user interaction (e.g., Start button) to unlock audio for later playback
+export function unlockAudio() {
+  const originalVolume = workCompleteSound.volume
+  workCompleteSound.volume = 0
+  restCompleteSound.volume = 0
+
+  workCompleteSound.play().then(() => {
+    workCompleteSound.pause()
+    workCompleteSound.currentTime = 0
+    workCompleteSound.volume = originalVolume
+  }).catch(() => {})
+
+  restCompleteSound.play().then(() => {
+    restCompleteSound.pause()
+    restCompleteSound.currentTime = 0
+    restCompleteSound.volume = originalVolume
+  }).catch(() => {})
+}
 
 export function playWorkComplete() {
   workCompleteSound.currentTime = 0
-  workCompleteSound.play().catch(() => {})
+  workCompleteSound.play().catch((error) => {
+    console.error('Failed to play work complete sound:', error.message)
+  })
 }
 
 export function playRestComplete() {
   restCompleteSound.currentTime = 0
-  restCompleteSound.play().catch(() => {})
+  restCompleteSound.play().catch((error) => {
+    console.error('Failed to play rest complete sound:', error.message)
+  })
 }

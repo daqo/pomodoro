@@ -8,7 +8,7 @@ import {
   getPomodorosForMonth,
   getOngoingEntry
 } from './db'
-import { playWorkComplete, playRestComplete } from './sounds'
+import { playWorkComplete, playRestComplete, unlockAudio } from './sounds'
 
 // ============================================================================
 // Constants
@@ -210,6 +210,7 @@ function App() {
     const duration = parseFloat(newDuration)
     if (isNaN(duration) || duration < MIN_DURATION || duration > MAX_DURATION) return
 
+    unlockAudio()
     addPomodoro(trimmedName, duration, currentDateStr)
     const ongoing = getOngoingEntry()
     setActiveEntry(ongoing)
@@ -230,6 +231,7 @@ function App() {
 
     if (remaining > 0) {
       // Resume the ongoing timer
+      unlockAudio()
       const ongoing = getOngoingEntry()
       if (ongoing) {
         setActiveEntry(ongoing)
