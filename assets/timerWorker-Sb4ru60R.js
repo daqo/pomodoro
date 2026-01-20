@@ -1,0 +1,1 @@
+(function(){"use strict";let e=null;self.onmessage=t=>{t.data.type==="start"?(clearInterval(e),e=setInterval(()=>{Date.now()>=t.data.endTime&&(self.postMessage({type:"complete"}),clearInterval(e),e=null)},1e3)):t.data.type==="stop"&&(clearInterval(e),e=null)}})();
